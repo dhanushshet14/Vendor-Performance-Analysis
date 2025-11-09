@@ -95,7 +95,7 @@ def clean_data(df):
 
 if __name__ == '__main__':
     #creating database connection
-    conn = sqlite3.connect('inventory.db')
+    conn = sqlite3.connect('inventory.db', timeout=30)
 
     logging.info('Creating Vendor Summary Table.... ')
     summary_df = create_vendor_summary(conn)

@@ -3,6 +3,7 @@ import os
 from sqlalchemy import create_engine
 import logging
 import time
+from sqlalchemy.exc import OperationalError
 
 logging.basicConfig(
     filename="logs/ingestion_db.log",
@@ -12,11 +13,24 @@ logging.basicConfig(
 
 )
 
-engine = create_engine('sqlite:///inventory.db')
+engine = create_engine('sqlite:///inventory.db', 
+                      connect_args={'timeout': 60, 'check_same_thread': False},
+                      pool_pre_ping=True, pool_recycle=300)
 
 def ingest_db(df, table_name, engine):
     ''''this function will ingest the dataframe into table'''
-    df.to_sql(table_name, con = engine, if_exists='replace', index=False)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                df.to_sql(table_name, con = conn, if_exists='replace', index=False)
+            break
+        except OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                logging.warning(f"Database locked, retrying in 2 seconds... (attempt {attempt + 1})")
+                time.sleep(2)
+            else:
+                raise
 
 
 def load_raw_data():
